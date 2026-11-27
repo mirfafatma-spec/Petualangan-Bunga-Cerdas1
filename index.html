@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Juragan Muda: Petualangan Cerdas Bunga</title>
+<style>
+:root{--bg:#10294a;--card:#183a66;--gold:#ffc83d;--ok:#2ecc71;--no:#ff6b6b}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.5 Verdana,Arial,sans-serif;background:var(--bg);color:#fff}
+.wrap{max-width:760px;margin:0 auto;padding:14px}
+.card{background:var(--card);border-radius:16px;padding:16px;margin:12px 0}
+h1{font-size:26px;margin:.3em 0;color:var(--gold)}
+h2{font-size:20px;color:var(--gold);margin:0 0 8px}
+button{font:inherit;min-height:44px;padding:10px 16px;border:0;border-radius:12px;background:var(--gold);color:#222;font-weight:bold;cursor:pointer;margin:4px 0}
+button.opt{display:block;width:100%;text-align:left;background:#fff;color:#123}
+button.opt.ok{background:var(--ok)}button.opt.no{background:var(--no)}
+button:disabled{opacity:.55}
+input,select{font:inherit;padding:10px;border-radius:10px;border:0;width:100%;margin:4px 0}
+.bar{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;background:#0b1e38;border-radius:12px;padding:8px 12px}
+.map{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.node{padding:14px;border-radius:14px;background:#244b80;text-align:center}
+.node.lock{opacity:.5}.node button{width:100%}
+.fb{margin-top:8px;padding:10px;border-radius:10px;background:#0b1e38}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{border:1px solid #3a5f93;padding:4px 6px;text-align:right}th{text-align:center}
+canvas{width:100%;background:#0b1e38;border-radius:12px}
+.hid{display:none}
+</style></head>
+<body><div class="wrap" id="app"></div>
+<script>
+const $=id=>document.getElementById(id);
+const rp=n=>'Rp'+Math.round(n).toLocaleString('id-ID');
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const shuf=a=>a.slice().sort(()=>Math.random()-.5);
+const S={nama:'',modal:1000000,stars:[0,0,0,0],done:[0,0,0,0],ok:[0,0,0,0],tot:[8,8,3,3]};
+const NAMA=['Misi 1: Tabungan Koperasi Sekolah (Bunga Tunggal)','Misi 2: Investasi dan Pinjaman Berlipat (Bunga Majemuk)','Misi 3: Laboratorium Simulasi Bunga','Misi 4: Keputusan Bijak'];
+function show(h){$('app').innerHTML=h;window.scrollTo(0,0)}
+function bar(){return `<div class="bar"><span>👤 ${S.nama}</span><span>🪙 ${rp(S.modal)}</span><span>⭐ ${S.stars.reduce((a,b)=>a+b,0)}</span></div>`}
+function stars(m){const r=S.ok[m]/S.tot[m];S.stars[m]=r>=1?3:r>=0.8?2:r>=0.6?1:0;S.done[m]=1}
+
+function home(){show(`<div class="card"><h1>🏦 Juragan Muda: Petualangan Cerdas Bunga</h1>
+<p>Selamat datang, Juragan! Modalmu <b>Rp1.000.000</b>. Kelola dengan cerdas lewat bunga tunggal dan majemuk.</p>
+<p><b>Tujuan:</b> menerapkan konsep bunga tunggal dan bunga majemuk untuk menyelesaikan masalah tabungan dan pinjaman sehari-hari.</p>
+<input id="nm" placeholder="Tulis namamu" maxlength="20">
+<button onclick="start()">▶ Mulai Petualangan</button> ${saved()}
+<button onclick="$('pt').classList.toggle('hid')">📖 Petunjuk</button>
+<div id="pt" class="fb hid">Selesaikan empat misi secara berurutan. Jawaban benar menambah modal (+Rp100.000), jawaban salah mengurangi (−Rp50.000), dan petunjuk berharga Rp20.000. Kumpulkan bintang sebanyak mungkin!</div>
+<p style="font-size:13px">Pengembang: Fatmawaty, SMKN 2 Pangkep. Disusun dengan bantuan Claude (AI); ikon berupa emoji bawaan perangkat, tanpa gambar atau audio pihak ketiga.</p></div>`)}
+function start(){S.nama=($('nm').value||'Juragan').trim();map()}
+function save(){try{localStorage.setItem('jm',JSON.stringify(S))}catch(e){}}
+function saved(){try{const s=JSON.parse(localStorage.getItem('jm')||'null');if(s&&s.nama)return `<button onclick="resume()">⏩ Lanjutkan sebagai ${String(s.nama).replace(/[<>&]/g,'')}</button>`}catch(e){}return ''}
+function resume(){try{Object.assign(S,JSON.parse(localStorage.getItem('jm')));map()}catch(e){home()}}
+function map(){save();
+ let h=bar()+`<div class="card"><h2>🗺️ Peta Misi</h2><div class="map">`;
+ NAMA.forEach((n,i)=>{const open=i==0||S.done[i-1];
+  h+=`<div class="node ${open?'':'lock'}"><div>${open?'🔓':'🔒'} ${n}</div><div>${'⭐'.repeat(S.stars[i])||'—'}</div><button ${open?'':'disabled'} onclick="go(${i})">${S.done[i]?'Ulangi':'Main'}</button></div>`});
+ h+=`</div>${S.done[3]?'<button onclick="report()">📊 Lihat Rapor</button>':''}<br><button onclick="home()">🏠 Beranda</button></div>`;show(h)}
+function go(i){S.ok[i]=0;if(i<2)quiz(i);else if(i==2)lab();else decide()}
+
+/* ---------- Soal acak Misi 1 dan 2 ---------- */
+function uniq(ans,d){const o=[Math.round(ans)];d.forEach((v,k)=>{v=Math.round(v);while(o.includes(v))v+=1000*(k+1);o.push(v)});return o}
+function tbl(M,r,n){let s='Nilai akhir tiap periode (barisan geometri):<br>';for(let p=1;p<=n;p++)s+=`Periode ${p}: ${rp(M*Math.pow(1+r,p))}<br>`;return s}
+function mk(m,k){
+ const M=pick([1e6,1.5e6,2e6,2.5e6,3e6,4e6,5e6]),nm=pick(['Dina','Raka','Sari','Andi','Wati']);
+ let text,ans,d,ex,hint,tab=null;
+ if(m==0){
+  const i=pick([4,5,6,8,10,12]),r=i/100;
+  if(k%3==0){const t=pick([2,3,4,5]),b=M*r*t;ans=M+b;
+   text=`${nm} menabung ${rp(M)} di koperasi sekolah dengan bunga tunggal ${i}% per tahun. Berapa total tabungan ${nm} setelah ${t} tahun?`;
+   d=[b,M*Math.pow(1+r,t),M*(1+r)];
+   ex=`Bunga = M × i × t = ${rp(M)} × ${i}% × ${t} = ${rp(b)}.<br>Total = ${rp(M)} + ${rp(b)} = ${rp(ans)}.`}
+  else if(k%3==1){const bl=pick([6,9,18,24]);ans=M*r*bl/12;
+   text=`${nm} meminjam ${rp(M)} dengan bunga tunggal ${i}% per tahun selama ${bl} bulan. Berapa besar bunganya?`;
+   d=[M*r*bl,M+ans,M*r];
+   ex=`Waktu = ${bl}/12 tahun. Bunga = ${rp(M)} × ${i}% × ${bl}/12 = ${rp(ans)}.`}
+  else{const t=pick([2,3,4]),b=M*r*t;ans=M+b;
+   text=`${nm} meminjam ${rp(M)} dengan bunga tunggal ${i}% per tahun. Berapa total yang harus dikembalikan setelah ${t} tahun?`;
+   d=[b,M*Math.pow(1+r,t),M*(1+r*(t+1))];
+   ex=`Bunga = ${rp(M)} × ${i}% × ${t} = ${rp(b)}.<br>Total = ${rp(M)} + ${rp(b)} = ${rp(ans)}.`}
+  hint='Bunga tunggal: Bunga = M × i × t (t dalam tahun), Total = M + Bunga. Bunganya selalu dihitung dari modal awal.';
+ }else{
+  hint='Bunga majemuk: Mn = M × (1 + i)^n, dan bunga = Mn − M. Bunganya ikut berbunga di periode berikutnya.';
+  if(k%3==0){const i=pick([5,6,8,10]),r=i/100,n=pick([3,4,5]);ans=M*Math.pow(1+r,n);if(k==3)tab={M,r,n};
+   text=`${nm} menginvestasikan ${rp(M)} dengan bunga majemuk ${i}% per tahun. Berapa nilai investasi setelah ${n} tahun?`;
+   d=[M*(1+r*n),ans-M,M*Math.pow(1+r,n-1)];
+   ex=`Mn = ${rp(M)} × (1 + ${i}%)^${n} = ${rp(ans)}.<br>${tbl(M,r,n)}`}
+  else if(k%3==1){const i=pick([1,1.5,2]),r=i/100,n=pick([3,4,6]);ans=M*Math.pow(1+r,n);
+   text=`${nm} meminjam ${rp(M)} dengan bunga majemuk ${i}% per bulan selama ${n} bulan. Berapa total yang harus dikembalikan?`;
+   d=[M*(1+r*n),M*r*n,M*Math.pow(1+r,n-1)];
+   ex=`Mn = ${rp(M)} × (1 + ${i}%)^${n} = ${rp(ans)}.<br>${tbl(M,r,n)}`}
+  else{const i=pick([5,6,8,10]),r=i/100,n=pick([2,3,4]),mn=M*Math.pow(1+r,n);ans=mn-M;
+   text=`${nm} menabung ${rp(M)} dengan bunga majemuk ${i}% per tahun. Berapa besar bunga yang diperoleh setelah ${n} tahun?`;
+   d=[mn,M*r*n,M*r];
+   ex=`Mn = ${rp(M)} × (1 + ${i}%)^${n} = ${rp(mn)}.<br>Bunga = Mn − M = ${rp(ans)}.<br>${tbl(M,r,n)}`}
+ }
+ return {text:tab?text+' Lengkapi tabel nilai investasi pada akhir setiap tahun (bulatkan ke rupiah).':text,ans:Math.round(ans),opts:shuf(uniq(ans,d)),ex,hint,fill:k%2==1,tab}
+}
+let Q={};
+function quiz(m){Q={m,i:0,qs:[0,1,2,3,4,5,6,7].map(k=>mk(m,k)),ans:false,hint:false};rq()}
+function rq(){
+ const q=Q.qs[Q.i];Q.ans=false;Q.hint=false;
+ show(bar()+`<div class="card"><h2>${NAMA[Q.m]}</h2><p>Soal ${Q.i+1} dari 8</p><p>${q.text}</p>
+ ${inp(q)}
+ <button onclick="hint()">💡 Petunjuk (−Rp20.000)</button><div id="fb"></div><button id="nx" class="hid" onclick="nxt()">Lanjut ➜</button>
+ <br><button onclick="map()">🗺️ Peta</button></div>`)}
+function inp(q){
+ if(q.tab){let h='<table><tr><th>Akhir tahun</th><th>Nilai (Rp)</th></tr>';for(let p=1;p<=q.tab.n;p++)h+=`<tr><td>${p}</td><td><input id="t${p}" inputmode="numeric" placeholder="Rp"></td></tr>`;return h+'</table><button onclick="chk()">Periksa tabel</button>'}
+ if(q.fill)return '<input id="fi" inputmode="numeric" placeholder="Ketik jawabanmu (angka rupiah)"><button onclick="chk()">Periksa jawaban</button>';
+ return q.opts.map((o,j)=>`<button class="opt" id="o${j}" onclick="ans(${j})">${rp(o)}</button>`).join('')}
+const val=id=>{const s=($(id).value||'').replace(/[^0-9,.\-]/g,'');const t=s.replace(/\./g,'').replace(',','.');return t===''?NaN:Math.round(parseFloat(t))};
+function chk(){
+ if(Q.ans)return;const q=Q.qs[Q.i];let ok;
+ if(q.tab){const v=[];for(let p=1;p<=q.tab.n;p++)v.push(val('t'+p));if(v.some(isNaN)){$('fb').innerHTML='<div class="fb">Isi semua kolom tabel dulu ya.</div>';return}
+  ok=v.every((x,p)=>Math.abs(x-Math.round(q.tab.M*Math.pow(1+q.tab.r,p+1)))<=10)}
+ else{const x=val('fi');if(isNaN(x)){$('fb').innerHTML='<div class="fb">Ketik angka jawabanmu dulu ya.</div>';return}ok=Math.abs(x-q.ans)<=10}
+ Q.ans=true;
+ if(ok){S.ok[Q.m]++;S.modal+=100000}else S.modal=Math.max(0,S.modal-50000);
+ $('fb').innerHTML=`<div class="fb">${ok?'✅ Benar! +Rp100.000':'❌ Belum tepat. −Rp50.000'}<br>${q.tab?'':'Jawaban benar: '+rp(q.ans)+'<br>'}${q.ex}</div>`;$('nx').classList.remove('hid')}
+function hint(){if(Q.hint||Q.ans)return;Q.hint=true;S.modal=Math.max(0,S.modal-20000);$('fb').innerHTML=`<div class="fb">💡 ${Q.qs[Q.i].hint}</div>`}
+function ans(j){
+ if(Q.ans)return;Q.ans=true;const q=Q.qs[Q.i],ok=q.opts[j]===q.ans;
+ q.opts.forEach((o,x)=>{if(o===q.ans)$('o'+x).classList.add('ok');else if(x==j)$('o'+x).classList.add('no')});
+ if(ok){S.ok[Q.m]++;S.modal+=100000}else S.modal=Math.max(0,S.modal-50000);
+ $('fb').innerHTML=`<div class="fb">${ok?'✅ Benar! +Rp100.000':'❌ Belum tepat. −Rp50.000'}<br>${q.ex}</div>`;$('nx').classList.remove('hid')}
+function nxt(){Q.i++;if(Q.i<8)rq();else{stars(Q.m);
+ show(bar()+`<div class="card"><h2>Misi selesai!</h2><p>Benar ${S.ok[Q.m]} dari 8 — ${'⭐'.repeat(S.stars[Q.m])||'belum ada bintang, coba ulangi'}</p><button onclick="map()">🗺️ Kembali ke Peta</button></div>`)}}
+
+/* ---------- Laboratorium Simulasi ---------- */
+function lab(){
+ show(bar()+`<div class="card"><h2>🔬 ${NAMA[2]}</h2>
+ <label>Modal: <b id="lM"></b></label><input type="range" id="sM" min="1000000" max="10000000" step="500000" value="2000000" oninput="draw()">
+ <label>Suku bunga per tahun: <b id="lI"></b></label><input type="range" id="sI" min="1" max="24" value="6" oninput="draw()">
+ <label>Lama: <b id="lT"></b></label><input type="range" id="sT" min="1" max="20" value="20" oninput="draw()">
+ <label>Periode bunga majemuk</label><select id="sP" onchange="draw()"><option value="1">Tahunan</option><option value="12">Bulanan</option></select>
+ <canvas id="cv" width="700" height="300"></canvas><p style="font-size:13px">🟡 Bunga tunggal &nbsp; 🟢 Bunga majemuk</p><div id="tb"></div></div>
+ <div class="card"><h2>Pertanyaan Penyelidikan</h2><div id="mq"></div></div><button onclick="map()">🗺️ Peta</button>`);
+ draw();
+ runMcq(2,[
+ {t:'Atur modal Rp2.000.000, bunga 6%, lama 20 tahun, periode tahunan. Pada tahun ke-20, bunga mana yang hasilnya lebih besar?',o:['Bunga tunggal','Bunga majemuk','Sama besar'],a:1,f:'Tunggal ≈ Rp4.400.000, majemuk ≈ Rp6.414.271. Bunga majemuk tumbuh berlipat karena bunga ikut berbunga.'},
+ {t:'Nilai tabungan tiap tahun pada bunga majemuk membentuk barisan...',o:['Aritmetika (selisih tetap)','Geometri (rasio tetap 1 + i)','Tidak beraturan'],a:1,f:'Majemuk: M, M(1+i), M(1+i)², ... adalah barisan geometri. Bunga tunggal membentuk barisan aritmetika.'},
+ {t:'Dengan modal, suku bunga, dan lama yang sama, bunga majemuk BULANAN dibandingkan TAHUNAN hasilnya...',o:['Sedikit lebih besar','Lebih kecil','Sama persis'],a:0,f:'Semakin sering bunga ditambahkan, semakin sering bunga ikut berbunga, sehingga nilai akhir sedikit lebih besar.'}]);
+}
+function draw(){
+ const M=+$('sM').value,i=+$('sI').value/100,t=+$('sT').value,p=+$('sP').value;
+ $('lM').textContent=rp(M);$('lI').textContent=(i*100)+'%';$('lT').textContent=t+' tahun';
+ const tg=y=>M*(1+i*y),mj=y=>M*Math.pow(1+i/p,p*y);
+ const c=$('cv'),g=c.getContext('2d'),W=c.width,H=c.height,L=70,B=30,mx=Math.max(tg(t),mj(t));
+ g.clearRect(0,0,W,H);g.strokeStyle='#5d7fb0';g.fillStyle='#cfe0ff';g.font='12px Arial';
+ g.beginPath();g.moveTo(L,10);g.lineTo(L,H-B);g.lineTo(W-10,H-B);g.stroke();
+ g.fillText(rp(mx),2,18);g.fillText(rp(M),2,H-B);g.fillText('0',L,H-10);g.fillText(t+' th',W-40,H-10);
+ [[tg,'#ffc83d'],[mj,'#2ecc71']].forEach(([f,col])=>{g.strokeStyle=col;g.lineWidth=3;g.beginPath();
+  for(let y=0;y<=t;y+=t/100){const x=L+(W-L-10)*y/t,yy=H-B-(H-B-10)*(f(y)-M)/(mx-M||1);y?g.lineTo(x,yy):g.moveTo(x,yy)}g.stroke()});
+ let h='<table><tr><th>Tahun</th><th>Tunggal</th><th>Majemuk</th><th>Selisih</th></tr>';
+ [1,2,3,5,10,15,20].filter(y=>y<=t).forEach(y=>h+=`<tr><td>${y}</td><td>${rp(tg(y))}</td><td>${rp(mj(y))}</td><td>${rp(mj(y)-tg(y))}</td></tr>`);
+ $('tb').innerHTML=h+'</table>'}
+
+/* ---------- Pilihan ganda umum (Lab dan Keputusan Bijak) ---------- */
+let R={};
+function runMcq(m,items,box){R={m,items,i:0,box,ans:false};rm()}
+function rm(){
+ const it=R.items[R.i];R.ans=false;
+ $(R.box).innerHTML=`<p>Pertanyaan ${R.i+1} dari ${R.items.length}</p><p>${it.t}</p>
+ ${it.o.map((o,j)=>`<button class="opt" id="m${j}" onclick="am(${j})">${o}</button>`).join('')}<div id="mf"></div>`}
+function am(j){
+ if(R.ans)return;R.ans=true;const it=R.items[R.i],ok=j===it.a;
+ it.o.forEach((o,x)=>{if(x===it.a)$('m'+x).classList.add('ok');else if(x==j)$('m'+x).classList.add('no')});
+ if(ok){S.ok[R.m]++;S.modal+=50000}
+ const last=R.i==R.items.length-1;
+ $('mf').innerHTML=`<div class="fb">${ok?'✅ Tepat! +Rp50.000':'❌ Belum tepat.'}<br>${it.f}</div><button onclick="${last?'fm()':'R.i++;rm()'}">${last?'Selesai ✔':'Lanjut ➜'}</button>`}
+function fm(){stars(R.m);
+ $(R.box).innerHTML=`<p>Selesai! Benar ${S.ok[R.m]} dari ${S.tot[R.m]} ${'⭐'.repeat(S.stars[R.m])}</p><button onclick="${R.m==3?'report()':'map()'}">${R.m==3?'📊 Lihat Rapor':'🗺️ Kembali ke Peta'}</button>`}
+
+/* ---------- Keputusan Bijak ---------- */
+const tot=(M,i,t,j)=>j?M*Math.pow(1+i/100,t):M*(1+i/100*t);
+function decide(){
+ show(bar()+`<div class="card"><h2>🧠 ${NAMA[3]}</h2><div id="kb"></div></div><button onclick="map()">🗺️ Peta</button>`);
+ const a1=tot(5e6,6,3,0),b1=tot(5e6,5,3,1),a2=tot(3e6,12,2,0),b2=tot(3e6,10,2,1),a3=tot(2e6,5,10,0),b3=tot(2e6,5,10,1);
+ runMcq(3,[
+ {t:'Kamu menabung Rp5.000.000 selama 3 tahun. Bank A: bunga tunggal 6% per tahun. Bank B: bunga majemuk 5% per tahun. Mana yang lebih menguntungkan?',o:['Bank A','Bank B'],a:a1>b1?0:1,f:`Bank A: ${rp(a1)}. Bank B: ${rp(b1)}. Pada waktu singkat, bunga majemuk tidak selalu menang jika suku bunganya lebih kecil.`},
+ {t:'Kamu meminjam Rp3.000.000 selama 2 tahun. Opsi X: bunga tunggal 12% per tahun. Opsi Y: bunga majemuk 10% per tahun. Mana yang lebih murah (total dikembalikan lebih kecil)?',o:['Opsi X','Opsi Y'],a:a2<b2?0:1,f:`Opsi X: ${rp(a2)}. Opsi Y: ${rp(b2)}. Bandingkan total yang dibayar, bukan hanya jenis bunganya.`},
+ {t:'Kamu menabung Rp2.000.000 selama 10 tahun dengan suku bunga sama, 5% per tahun. Pilihan A: bunga tunggal. Pilihan B: bunga majemuk. Mana yang lebih menguntungkan?',o:['Pilihan A','Pilihan B'],a:a3>b3?0:1,f:`A: ${rp(a3)}. B: ${rp(b3)}. Dengan bunga sama dan waktu panjang, bunga majemuk jauh lebih menguntungkan bagi penabung.`}],'kb')}
+
+/* ---------- Rapor ---------- */
+function report(){
+ const ind=[['1. Menghitung bunga tunggal',0],['2. Menghitung bunga majemuk',1],['3. Menjelaskan kaitan dengan barisan dan memahami pengaruh parameter',2],['4. Membandingkan skema dan memilih dengan bijak',3]];
+ let h=bar()+`<div class="card"><h2>📊 Rapor ${S.nama}</h2><table><tr><th>Indikator</th><th>Skor</th><th>Status</th></tr>`;
+ ind.forEach(([n,m])=>{const p=Math.round(100*S.ok[m]/S.tot[m]);h+=`<tr><td style="text-align:left">${n}</td><td>${p}%</td><td>${p>=70?'✅ Tercapai':'🔁 Perlu diulang'}</td></tr>`});
+ h+=`</table><p>Modal akhir: <b>${rp(S.modal)}</b> — Bintang: <b>${S.stars.reduce((a,b)=>a+b,0)}/12</b></p>
+ <div class="fb">Pesan juragan bijak: hitung dulu total yang kamu terima atau bayar, bandingkan suku bunga dan lamanya, baru putuskan. Pinjam seperlunya dan menabunglah sedini mungkin.</div>
+ <button onclick="map()">🗺️ Ulangi Misi</button> <button onclick="try{localStorage.removeItem('jm')}catch(e){}location.reload()">🏠 Main Lagi</button></div>`;show(h)}
+home();
+</script></body></html>
